@@ -1,4 +1,4 @@
-crew-ai
+crewai
 langchain-community
 pandas
 matplotlib

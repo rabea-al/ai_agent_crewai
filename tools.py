@@ -5,7 +5,8 @@ import deepl
 import pandas as pd
 import json
 import matplotlib.pyplot as plt
-import numpy as np
+
+
 class ConversionTools:
     name = "ConversionTools"
     description = "converts a batch of images from one format to another and saves the converted images in a specified output directory."
@@ -33,22 +34,21 @@ class ConversionTools:
         return f"All images converted to {target_format.upper()} and saved in {output_folder}"
 
 
+
 class TranslationTools:
     name = "TranslationTools"
     description = " Translate all texts within files You must send the language code (e.g., 'en' for English, 'ar' for Arabic) in `target_language` instead of the full language name."
-    
+    os.environ["DEEPL_API_KEY"] =""
     @tool("Translate text")
     def translate_text(input_file, target_language, output_file):
         """
         Translate the text from input_file to target_language using DeepL 
         and save to output_file.
         """
-        # قراءة النص من ملف الإدخال
         with open(input_file, 'r', encoding='utf-8') as f:
             text = f.read()
 
-        # إعداد مترجم DeepL
-        auth_key = os.getenv("DEEPL_API_KEY")  # مفتاح API من متغير البيئة
+        auth_key = os.getenv("DEEPL_API_KEY") 
         if not auth_key:
             return "DeepL API key is missing. Please set the DEEPL_API_KEY environment variable."
 
@@ -57,7 +57,6 @@ class TranslationTools:
         try:
             translated_text = translator.translate_text(text, target_lang=target_language.upper())
             
-            # كتابة النص المترجم إلى ملف الإخراج
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(translated_text.text)
 
@@ -66,14 +65,6 @@ class TranslationTools:
             return f"An error occurred during translation: {str(e)}"
 
 
-import os
-import pandas as pd
-import json
-from langchain_community.tools import tool
-
-import os
-import pandas as pd
-import json
 
 
 class FinancialAnalysisTools:
@@ -140,11 +131,9 @@ class FinancialAnalysisTools:
                 os.makedirs(output_folder)
                 print(f"Folder '{output_folder}' created successfully.")
                 
-            # قراءة وتحليل البيانات
             data = read_financial_documents(folder_path)
             analysis = analyze_data(data)
 
-            # كتابة التقرير بالنص المطلوب
             with open(text_output_file, 'w', encoding='utf-8') as f:
                 f.write(f"Total Revenue: {analysis['total_revenue']}\n")
                 f.write(f"Total Expenses: {analysis['total_expenses']}\n")
@@ -174,10 +163,6 @@ class FinancialAnalysisTools:
         except Exception as e:
             return f"An error occurred during analysis: {str(e)}"
 
-
-import json
-import matplotlib.pyplot as plt
-
 class VisualizationTools:
     name = "VisualizationTools"
     description = "Generate charts from JSON financial data."
@@ -191,18 +176,15 @@ class VisualizationTools:
         - net_profit_by_department
         """
         try:
-            # قراءة بيانات JSON
             with open(input_json, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
             department_analysis = eval(data["department_analysis"])
             region_analysis = eval(data["region_analysis"])
 
-            # تحويل بيانات الأقسام والمناطق من نص إلى قواميس
             department_analysis = eval(data["department_analysis"])
             region_analysis = eval(data["region_analysis"])
 
-            # 1. رسم إجمالي الإيرادات مقابل المصروفات
             plt.figure(figsize=(8, 6))
             revenue = int(data["total_revenue"])
             expenses = int(data["total_expenses"])
@@ -214,7 +196,6 @@ class VisualizationTools:
             plt.savefig(f"{output_folder}/total_revenue_vs_expenses.png")
             plt.close()
 
-            # 2. رسم الأداء الإقليمي
             plt.figure(figsize=(10, 6))
             regions = list(region_analysis.keys())
             revenues = [region_analysis[region]['total_revenue'] for region in regions]
@@ -231,7 +212,6 @@ class VisualizationTools:
             plt.savefig(f"{output_folder}/regional_performance.png")
             plt.close()
 
-            # 3. رسم صافي الربح حسب القسم
             plt.figure(figsize=(10, 6))
             departments = list(department_analysis.keys())
             net_profits = [department_analysis[dept]['net_profit'] for dept in departments]

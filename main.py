@@ -2,10 +2,8 @@ from crewai import Crew
 from agents import TranslatorAgents
 from tasks import TranslatorTasks
 import os
-import json
-# إعداد مفتاح OpenAI API
-os.environ["OPENAI_API_KEY"] = ""
 
+os.environ["OPENAI_API_KEY"] = ""
 class TranslatorCrew:
 
     def __init__(self, tasks):
@@ -15,10 +13,8 @@ class TranslatorCrew:
         agents = TranslatorAgents()
         task_manager = TranslatorTasks()
 
-        # إنشاء الوكيل
         translator_agent = agents.translator_agent()
 
-        # إعداد قائمة المهام
         crew_tasks = []
         for task in self.tasks:
             if task["type"] == "translation":
@@ -53,14 +49,12 @@ class TranslatorCrew:
             else:
                 print(f"Unknown task type: {task['type']}")
 
-        # تنفيذ المهام باستخدام الوكيل
         crew = Crew(
             agents=[translator_agent],
             tasks=crew_tasks,
             verbose=True
         )
 
-        # تنفيذ جميع المهام وإرجاع النتائج
         result = crew.kickoff()
         return result
 
@@ -94,11 +88,9 @@ if __name__ == "__main__":
        
     ]
 
-    # إنشاء وإدارة المهام
     translator_crew = TranslatorCrew(tasks)
     result = translator_crew.run()
 
-    # عرض النتائج
     print("\nTask Completed:")
     for res in result:
         print(f"- {res}")

@@ -1,6 +1,4 @@
 from crewai import Agent
-from langchain.llms import OpenAI
-
 from tools import TranslationTools, ConversionTools, FinancialAnalysisTools, VisualizationTools
 
 class TranslatorAgents:
