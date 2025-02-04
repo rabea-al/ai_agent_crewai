@@ -1,96 +1,158 @@
-from crewai import Crew
+from crewai import Crew, Task
 from agents import TranslatorAgents
-from tasks import TranslatorTasks
 import os
+import json
+import time
+from dotenv import load_dotenv
+from crewai.agents.parser import AgentAction
+from crewai.agents.crew_agent_executor import ToolResult
 
-os.environ["OPENAI_API_KEY"] = ""
+print(f"Current working directory: {os.getcwd()}")
+load_dotenv()
+
+output_directory = os.getcwd()
+
+def get_directory_snapshot(directory):
+    """
+   
+    """
+    snapshot = {}
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            full_path = os.path.join(root, file)
+            try:
+                mtime = os.stat(full_path).st_mtime
+            except Exception:
+                mtime = None
+            snapshot[full_path] = mtime
+    return snapshot
+
+def get_new_files(before_snapshot, after_snapshot):
+    """
+    """
+    new_files = []
+    for file_path in after_snapshot:
+        if file_path not in before_snapshot:
+            new_files.append(file_path)
+        else:
+            if before_snapshot[file_path] != after_snapshot[file_path]:
+                new_files.append(file_path)
+    return new_files
+
+current_task_thought_count = 0
+current_task_tool_usage_count = 0
+current_task_start_time = None
+current_task_file_snapshot = None
+
+json_file_path = "task_stats.json"
+
+def my_step_callback(step_output):
+    global current_task_thought_count, current_task_tool_usage_count
+    print(f"\n--- Step Output Debugging ---\n{step_output}\n--------------------------\n")
+    if isinstance(step_output, AgentAction):
+        current_task_thought_count += 1
+        print(f"LLM Call #{current_task_thought_count}: {step_output}")
+    elif isinstance(step_output, ToolResult):
+        current_task_tool_usage_count += 1
+        print(f"Tool Use #{current_task_tool_usage_count}: {step_output}")
+
+def my_task_callback(task_output):
+    global current_task_thought_count, current_task_tool_usage_count
+    global current_task_start_time, current_task_file_snapshot
+
+    execution_time = time.time() - current_task_start_time if current_task_start_time is not None else 0
+
+    task_name = task_output.description
+    print(f"\nTask Completed: {task_name}")
+    print(f"Output: {task_output.raw}\n")
+
+    time.sleep(1)
+
+    after_snapshot = get_directory_snapshot(output_directory)
+    new_files = get_new_files(current_task_file_snapshot, after_snapshot) if current_task_file_snapshot is not None else []
+
+    stats = {
+        "thought_count": current_task_thought_count,
+        "tool_usage_count": current_task_tool_usage_count,
+        "execution_time_seconds": execution_time,
+        "files_produced": new_files
+    }
+
+    print(f"New files created: {new_files}")
+
+    if os.path.exists(json_file_path):
+        with open(json_file_path, "r", encoding="utf-8") as f:
+            try:
+                existing_stats = json.load(f)
+            except json.JSONDecodeError:
+                existing_stats = {}
+    else:
+        existing_stats = {}
+    existing_stats[task_name] = stats
+    with open(json_file_path, "w", encoding="utf-8") as f:
+        json.dump(existing_stats, f, indent=4, ensure_ascii=False)
+    print(f"تم تحديث ملف {json_file_path} بالنتيجة الخاصة بالمهمة: {task_name}")
+
+    reset_task_globals()
+
+def reset_task_globals():
+    global current_task_thought_count, current_task_tool_usage_count
+    global current_task_start_time, current_task_file_snapshot
+    current_task_thought_count = 0
+    current_task_tool_usage_count = 0
+    current_task_start_time = None
+    current_task_file_snapshot = None
+
 class TranslatorCrew:
-
     def __init__(self, tasks):
         self.tasks = tasks
 
     def run(self):
         agents = TranslatorAgents()
-        task_manager = TranslatorTasks()
-
         translator_agent = agents.translator_agent()
+        overall_results = []
 
-        crew_tasks = []
         for task in self.tasks:
-            if task["type"] == "translation":
-                crew_tasks.append(task_manager.translation_task(
-                    translator_agent,
-                    task["input_file"],
-                    task["output_file"],
-                    task["target_language"]
-                ))
-            elif task["type"] == "conversion":
-                crew_tasks.append(task_manager.conversion_task(
-                    translator_agent,
-                    task["input_folder"],
-                    task["output_folder"],
-                    task["target_format"]
-                ))
-            elif task["type"] == "financial_analysis":
-                crew_tasks.append(task_manager.financial_analysis_task(
-                    translator_agent,
-                    task["folder_path"],
-                    task["text_output_file"],
-                    task["json_output_file"]
-                    
-                ))
-            elif task["type"] == "generate_charts":
-                crew_tasks.append(task_manager.generate_charts_task(
-                    translator_agent,
-                    task["input_json"],
-                    task["output_folder"]
-                ))
-            
-            else:
-                print(f"Unknown task type: {task['type']}")
+            print("\n==============================")
+            print(f"بدء المهمة: {task['description']}")
+            print("==============================\n")
+            reset_task_globals()
+            global current_task_start_time, current_task_file_snapshot
+            current_task_start_time = time.time()
+            current_task_file_snapshot = get_directory_snapshot(output_directory)
 
-        crew = Crew(
-            agents=[translator_agent],
-            tasks=crew_tasks,
-            verbose=True
-        )
-
-        result = crew.kickoff()
-        return result
-
+            crew_task = Task(
+                description=task["description"],
+                agent=translator_agent,
+                expected_output="Task successfully completed."
+            )
+            crew = Crew(
+                agents=[translator_agent],
+                tasks=[crew_task],
+                verbose=True,
+                task_callback=my_task_callback,
+                step_callback=my_step_callback
+            )
+            result = crew.kickoff()
+            overall_results.append(result)
+        return overall_results
 
 if __name__ == "__main__":
     tasks = [
         {
-            "type": "translation",
-            "input_file": "QA.txt",
-            "output_file": "translated.txt",
-            "target_language": "Japanese"
+            "description": "Translate the text inside the file QA.txt into Japanese, then answer the translated questions and save the answers in the translate folder in a file named answers.txt, and send summary to Slack."
         },
         {
-            "type": "conversion",
-            "input_folder": "new_dir",
-            "output_folder": "conv",
-            "target_format": "png"
+            "description": "Convert all images in the screenshots folder from JPEG to PNG and save them in the my_image folder, and send summary of result to Slack."
         },
         {
-            "type": "financial_analysis",
-            "folder_path": "financial_docs",
-            "text_output_file": "reports/report2024.txt",
-            "json_output_file": "reports/report2024.json"
+            "description": "Read the documents from the financial_docs folder, generate the financial report, and save the financial report in the report_55 folder as rr.txt and save it as rr.json as well. After that, generate the charts and save them in report_55, and send summary of result to Slack."
         },
-        {
-            "type": "generate_charts",
-            "input_json": "reports/report2024.json",
-            "output_folder": "reports"
-        }
-
-       
-    ]
+     ]
 
     translator_crew = TranslatorCrew(tasks)
-    result = translator_crew.run()
+    results = translator_crew.run()
 
-    print("\nTask Completed:")
-    for res in result:
+    print("\nFinal Task Results:")
+    for res in results:
         print(f"- {res}")

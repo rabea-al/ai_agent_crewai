@@ -1,48 +1,114 @@
+import json
 from crewai import Task
+from langchain_openai import ChatOpenAI
 from textwrap import dedent
 
+from crewai import Task
+from langchain_openai import ChatOpenAI
+from tools import TranslationTools, ConversionTools, FinancialAnalysisTools,VisualizationTools
 
 class TranslatorTasks:
-
-    def translation_task(self, agent, input_file, output_file, target_language):
-        return Task(
-            description=dedent(f"""
-                Translate the text from {input_file} to {target_language} and save it to {output_file}.
-            """),
-            agent=agent,
-            expected_output=f"Translated content saved in {output_file}"
+    def __init__(self):
+        self.llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.7
         )
 
-    def conversion_task(self, agent, input_folder, output_folder, target_format):
+    def translation_task(self, agent, description):
+        """
+        """
+        params = TranslationTools._parse_parameters_with_gpt(description, self.llm)
+        if not params:
+            raise ValueError("Failed to extract translation parameters.")
+        
         return Task(
-            description=dedent(f"""
-                Convert all images in {input_folder} to {target_format} format and save them in {output_folder}.
-            """),
+            description=description,
             agent=agent,
-            expected_output=f"All images converted to {target_format.upper()} and saved in {output_folder}"
+            expected_output=f"Translated content saved in {params['output_file']}"
         )
 
-    def financial_analysis_task(self, agent, folder_path, text_output_file, json_output_file):
-        return Task(
-            description=f"Analyze financial data in {folder_path} and generate two reports: {text_output_file} (text) and {json_output_file} (JSON).",
-            agent=agent,
-            expected_output=f"Reports saved in {text_output_file} and {json_output_file}",
-            inputs={
-                "folder_path": folder_path,
-                "text_output_file": text_output_file,
-                "json_output_file": json_output_file
-            }
-        )
-    def generate_charts_task(self, agent, input_json, output_folder):
-        return Task(
-            description=f"Generate charts from the financial analysis JSON report: {input_json}. Save charts to {output_folder}.",
-            agent=agent,
-            expected_output=f"Charts saved to {output_folder}",
-            inputs={
-                "input_json": input_json,
-                "output_folder": output_folder
-            }
+class ConversionTasks:
+    def __init__(self):
+        self.llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.7
         )
 
-   
+    def convert_images_task(self, agent, description):
+        """
+        """
+        params = ConversionTools._parse_parameters_with_gpt(description, self.llm)
+        if not params:
+            raise ValueError("Failed to extract conversion parameters.")
+        
+        return Task(
+            description=description,
+            agent=agent,
+            expected_output=f"All images converted to {params['target_format'].upper()} and saved in {params['output_folder']}"
+        )
+class FinancialAnalysisTasks:
+    def __init__(self):
+        self.llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.7
+        )
 
+    def analyze_financial_data_task(self, agent, description):
+        """
+        إنشاء مهمة تحليل البيانات المالية باستخدام المعلمات المستخرجة من `FinancialAnalysisTools`
+        """
+        params = FinancialAnalysisTools._parse_parameters_with_gpt(description, self.llm)
+        if not params:
+            raise ValueError("Failed to extract financial analysis parameters.")
+        
+        return Task(
+            description=description,
+            agent=agent,
+            expected_output="Financial analysis completed and returned as text and JSON."
+        )
+
+class VisualizationTasks:
+    def __init__(self):
+        self.llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.7
+        )
+
+    def generate_charts_task(self, agent, description):
+        """
+        إنشاء مهمة توليد الرسوم البيانية باستخدام المعلمات المستخرجة من `VisualizationTools`
+        """
+        params = VisualizationTools._parse_parameters_with_gpt(description, self.llm)
+        if not params:
+            raise ValueError("Failed to extract chart generation parameters.")
+        
+        return Task(
+            description=description,
+            agent=agent,
+            expected_output=f"Charts generated and saved in {params['output_folder']}"
+        )
+
+from crewai import Task
+from langchain_openai import ChatOpenAI
+from tools import SlackTools
+
+class SlackTasks:
+    def __init__(self):
+        self.llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.7
+        )
+
+    def send_summary_task(self, agent, description, result_summary):
+        """
+        إنشاء مهمة لإرسال ملخص المهمة إلى Slack إذا طلب ذلك في الوصف.
+        """
+        params = SlackTools._extract_slack_request(description, self.llm)
+        if not params["send_to_slack"]:
+            return None  # لا يتم إنشاء المهمة إذا لم يُطلب ذلك
+
+        return Task(
+            description="Send task summary to Slack.",
+            agent=agent,
+            expected_output="Summary successfully sent to Slack."
+        )
